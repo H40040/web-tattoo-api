@@ -1,1 +1,465 @@
-...
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Usuario {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  senha     String
+  nome      String
+  telefone  String?
+  tipo      TipoUsuario @default(CLIENTE)
+  mustResetSenha Boolean @default(false)
+  ativo     Boolean  @default(true)
+  criadoEm  DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+
+  estudiosMembro EstudioUsuario[] @relation("UsuarioMembros")
+  estudio   Estudio?
+  convitesCriados ConviteEquipe[] @relation("UsuarioConvites")
+  auditLogs       AuditLog[] @relation("UsuarioLogs")
+  
+  @@map("usuarios")
+}
+
+model Estudio {
+  id          String   @id @default(cuid())
+  nome        String
+  descricao   String?
+  telefone    String
+  whatsapp    String
+  email       String
+  endereco    String?
+  instagram   String?
+  facebook    String?
+  website     String?
+  horarioFuncionamento String?
+  slug        String   @unique
+  dominio     String?  @unique
+  dominioStatus DominioStatus @default(NENHUM)
+  dominioToken  String?
+  dominioVerificadoEm DateTime?
+  dominioUltimaVerificacao DateTime?
+  template    Template @default(MODERNO)
+  cores       Json?
+  // Publicação do site (Sprint 2)
+  publicado   Boolean  @default(false)
+  // Onboarding em passos para aumentar ativação e conversão
+  onboardingStep Int   @default(0)
+  onboardingConcluido Boolean @default(false)
+  ativo       Boolean  @default(true)
+  criadoEm    DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+
+  usuarioId   String   @unique
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  
+  projetos    Projeto[]
+  depoimentos Depoimento[]
+  orcamentos  Orcamento[]
+  planoAssinatura PlanoAssinatura?
+  contatos    Contato[]
+  membros     EstudioUsuario[] @relation("EstudioMembros")
+  convites    ConviteEquipe[] @relation("EstudioConvites")
+  eventos     EventoUso[]
+  auditLogs   AuditLog[]
+
+
+  @@index([criadoEm])
+  @@index([publicado])
+  @@index([onboardingConcluido])
+  @@map("estudios")
+}
+
+model EstudioUsuario {
+  id        String @id @default(cuid())
+  estudioId String
+  usuarioId String
+  role      RoleNoEstudio @default(STAFF)
+  criadoEm  DateTime @default(now())
+
+  estudio   Estudio @relation("EstudioMembros", fields: [estudioId], references: [id], onDelete: Cascade)
+  usuario   Usuario @relation("UsuarioMembros", fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@unique([estudioId, usuarioId])
+  @@map("estudio_usuarios")
+}
+
+enum RoleNoEstudio {
+  OWNER
+  ADMIN
+  STAFF
+}
+
+enum DominioStatus {
+  NENHUM
+  PENDENTE
+  VERIFICADO
+  ATIVO
+  ERRO
+}
+
+model Projeto {
+  id          String   @id @default(cuid())
+  titulo      String
+  descricao   String?
+  imagens     String[]
+  videos      String[]
+  categoria   CategoriaProjeto @default(TRADICIONAL)
+  tags        String[]
+  destaque    Boolean  @default(false)
+  ativo       Boolean  @default(true)
+  criadoEm    DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  estudioId   String
+  estudio     Estudio  @relation(fields: [estudioId], references: [id], onDelete: Cascade)
+
+  @@index([estudioId, criadoEm])
+
+  @@map("projetos")
+}
+
+model Depoimento {
+  id          String   @id @default(cuid())
+  nome        String
+  texto       String
+  avaliacao   Int      @default(5)
+  foto        String?
+  aprovado    Boolean  @default(false)
+  criadoEm    DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  estudioId   String
+  estudio     Estudio  @relation(fields: [estudioId], references: [id], onDelete: Cascade)
+
+  @@index([estudioId, criadoEm])
+
+  @@map("depoimentos")
+}
+
+model Orcamento {
+  id          String   @id @default(cuid())
+  nome        String
+  email       String
+  telefone    String
+  descricao   String
+  tamanho     TamanhoTatuagem @default(PEQUENO)
+  cor         Boolean  @default(false)
+  parteCorpo  String[]
+  referencias String[]
+  orcamento   Float?
+  status      StatusOrcamento @default(PENDENTE)
+  criadoEm    DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  estudioId   String
+  estudio     Estudio  @relation(fields: [estudioId], references: [id], onDelete: Cascade)
+
+  @@index([estudioId, criadoEm])
+
+  @@map("orcamentos")
+}
+
+model Plano {
+  codigo      String   @unique
+  id          String   @id @default(cuid())
+  nome        String
+  descricao   String
+  preco       Float
+  stripePriceId String?
+  recursos    String[]
+  limiteProjetos Int?
+  limiteDepoimentos Int?
+  limiteOrcamentosMensal Int?
+  limiteUsuarios Int?
+  permiteTemplatesPremium Boolean @default(false)
+  ativo       Boolean  @default(true)
+  criadoEm    DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  assinaturas PlanoAssinatura[]
+
+  @@map("planos")
+}
+
+model PlanoAssinatura {
+  id          String   @id @default(cuid())
+  status      StatusAssinatura @default(INCOMPLETE)
+  ativo       Boolean  @default(false)
+  dataInicio  DateTime @default(now())
+  dataFim     DateTime?
+  currentPeriodEnd DateTime?
+
+  stripeCustomerId String?
+  stripeSubscriptionId String?
+  stripeCheckoutSessionId String?
+  criadoEm    DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  estudioId   String   @unique
+  estudio     Estudio  @relation(fields: [estudioId], references: [id], onDelete: Cascade)
+  planoId     String
+  plano       Plano    @relation(fields: [planoId], references: [id], onDelete: Cascade)
+
+  @@map("plano_assinaturas")
+}
+
+enum TipoUsuario {
+  CLIENTE
+  TATUADOR
+  ADMIN
+  SUPERADMIN
+}
+
+enum Template {
+  MODERNO
+  CLASSICO
+  MINIMALISTA
+  ARTESANAL
+  URBANO
+}
+
+enum CategoriaProjeto {
+  TRADICIONAL
+  REALISTA
+  GEOMETRICO
+  AQUARELA
+  BLACKWORK
+  OLD_SCHOOL
+  NEW_SCHOOL
+  JAPONESA
+  TRIBAL
+  LETTERING
+}
+
+enum TamanhoTatuagem {
+  PEQUENO
+  MEDIO
+  GRANDE
+  EXTRA_GRANDE
+}
+
+enum StatusOrcamento {
+  PENDENTE
+  EM_ANALISE
+  APROVADO
+  REJEITADO
+  CONCLUIDO
+}
+
+enum StatusAssinatura {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+}
+
+model Contato {
+  id          String   @id @default(cuid())
+  nome        String
+  email       String
+  telefone    String?
+  assunto     String?
+  mensagem    String
+  lido        Boolean  @default(false)
+  criadoEm    DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  estudioId   String
+  estudio     Estudio  @relation(fields: [estudioId], references: [id], onDelete: Cascade)
+
+  @@index([estudioId, criadoEm])
+
+  @@map("contatos")
+}
+
+// Sprint 5: Convites de equipe por e-mail (token) + auditoria + eventos de uso
+model ConviteEquipe {
+  id         String   @id @default(cuid())
+  email      String
+  role       RoleNoEstudio @default(STAFF)
+  token      String   @unique
+  expiraEm   DateTime
+  aceitoEm   DateTime?
+  criadoEm   DateTime @default(now())
+
+  estudioId  String
+  estudio    Estudio  @relation("EstudioConvites", fields: [estudioId], references: [id], onDelete: Cascade)
+
+  criadoPorUsuarioId String?
+  criadoPorUsuario   Usuario? @relation("UsuarioConvites", fields: [criadoPorUsuarioId], references: [id], onDelete: SetNull)
+
+  @@unique([estudioId, email])
+  @@map("convites_equipe")
+}
+
+enum TipoEventoUso {
+  LOGIN
+  PUBLISH_SITE
+  LEAD_CREATED
+  PROJECT_CREATED
+  INVITE_SENT
+  INVITE_ACCEPTED
+  ONBOARDING_STEP
+  CHECKOUT_STARTED
+  SUBSCRIPTION_ACTIVE
+}
+
+model EventoUso {
+  id        String   @id @default(cuid())
+  tipo      TipoEventoUso
+  quantidade Int     @default(1)
+  metadata  Json?
+  criadoEm  DateTime @default(now())
+
+  estudioId String
+  estudio   Estudio  @relation(fields: [estudioId], references: [id], onDelete: Cascade)
+
+  @@index([estudioId, criadoEm])
+  @@map("eventos_uso")
+}
+
+enum AcaoAuditoria {
+  DOMINIO_SOLICITADO
+  DOMINIO_VERIFICADO
+  DOMINIO_ATIVADO
+  DOMINIO_ERRO
+  ASSINATURA_ATUALIZADA
+  USUARIO_ADICIONADO
+  USUARIO_REMOVIDO
+  CONVITE_CRIADO
+  CONVITE_ACEITO
+  CONVITE_EXPIRADO
+  STATUS_CLIENTE_ALTERADO
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  acao      AcaoAuditoria
+  entidade  String?
+  entidadeId String?
+  metadata  Json?
+  ip        String?
+  userAgent String?
+  criadoEm  DateTime @default(now())
+
+  actorUsuarioId String?
+  actorUsuario   Usuario? @relation("UsuarioLogs", fields: [actorUsuarioId], references: [id], onDelete: SetNull)
+
+  estudioId String?
+  estudio   Estudio? @relation(fields: [estudioId], references: [id], onDelete: SetNull)
+
+  @@index([estudioId, criadoEm])
+  @@index([actorUsuarioId, criadoEm])
+  @@map("audit_logs")
+}
+
+// Novos Models (Feature Flags e Permissions) - Adicionados na correção de Deploy
+
+model FeatureFlag {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  description String?
+  criadoEm  DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  planFlags PlanFeatureFlag[]
+  overrides TenantFeatureOverride[]
+
+  @@map("feature_flags")
+}
+
+model PlanFeatureFlag {
+  id        String   @id @default(cuid())
+  planCode  String   // ex: STARTER, PRO, STUDIO
+  flagCode  String
+  enabled   Boolean  @default(false)
+  criadoEm  DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  flag FeatureFlag @relation(fields: [flagCode], references: [code], onDelete: Cascade)
+
+  @@unique([planCode, flagCode])
+  @@map("plan_feature_flags")
+}
+
+model TenantFeatureOverride {
+  id        String   @id @default(cuid())
+  estudioId String
+  flagCode  String
+  enabled   Boolean
+  criadoEm  DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  flag FeatureFlag @relation(fields: [flagCode], references: [code], onDelete: Cascade)
+
+  @@unique([estudioId, flagCode])
+  @@map("tenant_feature_overrides")
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?
+  criadoEm    DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  rolePerms RolePermission[]
+  overrides TenantPermissionOverride[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  id        String   @id @default(cuid())
+  studioRole String  // OWNER | ADMIN | STAFF
+  permCode  String
+  allowed   Boolean  @default(true)
+  criadoEm  DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  perm Permission @relation(fields: [permCode], references: [code], onDelete: Cascade)
+
+  @@unique([studioRole, permCode])
+  @@map("role_permissions")
+}
+
+model TenantPermissionOverride {
+  id        String   @id @default(cuid())
+  estudioId String
+  permCode  String
+  allowed   Boolean
+  criadoEm  DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  perm Permission @relation(fields: [permCode], references: [code], onDelete: Cascade)
+
+  @@unique([estudioId, permCode])
+  @@map("tenant_permission_overrides")
+}
+
+model CohortSnapshot {
+  id        String   @id @default(cuid())
+  date      DateTime // dia da coorte
+  windowDays Int     // 7, 14, 30
+  tenants   Int
+  activated Int
+  retained  Int
+  converted Int
+  criadoEm  DateTime @default(now())
+
+  @@unique([date, windowDays])
+  @@map("cohort_snapshots")
+}

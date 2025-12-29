@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: api-tattoo
+    env: node
+    plan: free
+    region: ohio
+    # Build Command: Instala deps -> Vai para pasta API -> Aplica migrations no Neon -> Build (Prisma Generate + TSC)
+    buildCommand: pnpm install && npx prisma migrate deploy && pnpm run build
+    startCommand: node dist/server.js
+    envVars:
+      - key: DATABASE_URL
+        sync: false # Configurar no Dashboard do Render (Connection Pooling do Neon)
+      - key: DIRECT_URL
+        sync: false # Configurar no Dashboard do Render (Direct Connection do Neon)
+      - key: JWT_SECRET
+        generateValue: true
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: CORS_ORIGINS
+        sync: false # Adicione a URL do frontend (Vercel) aqui. Ex: https://meu-app.vercel.app
+    autoDeploy: false
+
+# Nota: O banco de dados agora é externo (Neon).
+# Configure as variáveis DATABASE_URL e DIRECT_URL no painel do Render.
+# DATABASE_URL = Connection string com pooler (host com -pooler)
+# DIRECT_URL = Connection string direta (host sem -pooler)
